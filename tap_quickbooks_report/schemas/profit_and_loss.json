@@ -1,0 +1,25 @@
+{
+  "type": ["null", "object"],
+  "additionalProperties": false,
+  "properties": {
+    "StartDate": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "EndDate": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "ColKey": {
+      "type": ["null", "string"]
+    },
+    "ReportData": {
+      "type": ["null", "object"],
+      "additionalProperties": true
+    },
+    "SyncTimestampUtc": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    }
+  }
+}
