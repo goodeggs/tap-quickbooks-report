@@ -1,0 +1,41 @@
+{
+  "type": ["null", "object"],
+  "additionalProperties": false,
+  "properties": {
+    "Date": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "TransactionType": {
+      "type": ["null", "string"]
+    },
+    "Num": {
+      "type": ["null", "string"]
+    },
+    "Name": {
+      "type": ["null", "string"]
+    },
+    "Memo": {
+      "type": ["null", "string"]
+    },
+    "Split": {
+      "type": ["null", "string"]
+    },
+    "Amount": {
+      "type": ["null", "number"]
+    },
+    "Balance": {
+      "type": ["null", "number"]
+    },
+    "Categories": {
+      "type": ["null", "array"],
+      "items": {
+        "type": ["null", "string"]
+      }
+    },
+    "SyncTimestampUtc": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    }
+  }
+}
