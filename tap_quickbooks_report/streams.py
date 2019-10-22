@@ -90,7 +90,14 @@ class QuickbooksStream:
         if auth_client.refresh_token == self.config.get("refresh_token"):
             LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API are identical.")
         else:
-            LOGGER.warning("Config file Refresh Token and Refresh Token received from Refresh Token API has drifted.")
+            LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API has drifted.")
+            LOGGER.info("Overwriting Config file with new Refresh Token values..")
+
+            self.config["refresh_token"] = auth_client.refresh_token
+            self.config["refresh_token_expires_at"] = datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=auth_client.x_refresh_token_expires_in)), '%Y-%m-%d %H:%M:%S %Z')
+
+            with open('/app/.config/quickbooks.config.json', 'w') as f:
+                json.dump(self.config, f, indent=2)
 
         # Check Refresh Token Expiry.
         self._check_token_expiry(auth_client)
