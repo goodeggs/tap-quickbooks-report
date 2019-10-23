@@ -94,8 +94,10 @@ class QuickbooksStream:
         if method not in ['get', 'set']:
             raise ValueError('Value for "method" supplied to _secrets_helper must be either "get" or "set".')
 
+        script_path = self._get_abs_path("bin")
+
         if method == 'get':
-            proc = subprocess.Popen(['./tap_quickbooks_report/bin/secrets_helper.sh', 'get'], stdout=subprocess.PIPE)
+            proc = subprocess.Popen([f"{script_path}/secrets_helper.sh", 'get'], stdout=subprocess.PIPE)
             returncode = proc.wait()
             if returncode != 0:
                 raise RuntimeError("secrets_helper get returned non-zero exit code")
@@ -105,7 +107,7 @@ class QuickbooksStream:
             raise ValueError('secrets_json must be supplied when using "set" method for secrets_helper.')
 
         else:
-            proc = subprocess.Popen(['./tap_quickbooks_report/bin/secrets_helper.sh', 'set', secrets_json])
+            proc = subprocess.Popen([f"{script_path}/secrets_helper.sh", 'set', secrets_json])
             returncode = proc.wait()
             if returncode != 0:
                 raise RuntimeError("secrets_helper set returned non-zero exit code")
