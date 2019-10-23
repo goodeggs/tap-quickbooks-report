@@ -23,7 +23,7 @@ Enter the Authorization Code: <auth-code>
 Enter the Realm ID: <realm-id>
 ```
 
-After entering the Authorization Code and Realm ID values, the tap will return a new config file. Replace your existing config file with these new values:
+After entering the Authorization Code and Realm ID values, the tap will write the Realm ID, Refresh Token, and Refresh Token Expiration Date to the existing Config file:
 
 ```
 (tap-quickbooks-report) bash-3.2$ tap-quickbooks-report --auth
@@ -31,13 +31,4 @@ INFO Starting User Consent process..
 Enter the Authorization Code: <auth-code>
 Enter the Realm ID: <realm-id>
 INFO Generating new config..
-{
- "client_id": "<client-id>",
- "client_secret": "<client-secret>",
- "redirect_uri": "https://developer.intuit.com/v2/OAuth2Playground/RedirectUrl",
- "environment": "production",
- "realm_id": "<realm-id>",
- "refresh_token": "<refresh-token>",
- "refresh_token_expires_at": "<refresh-token-expires-at"
-}
 ```

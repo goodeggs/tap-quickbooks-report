@@ -23,6 +23,7 @@ class QuickbooksStream:
     API_MINOR_VERSION = 40
 
     config: Dict = attr.ib()
+    args: Dict = attr.ib()
     @config.validator
     def check(self, attribute, value):
         if value.get("environment") not in ["sandbox", "production"]:
@@ -37,6 +38,12 @@ class QuickbooksStream:
         '''
         schema_path = self._get_abs_path("schemas")
         return singer.utils.load_json(f"{schema_path}/{self.tap_stream_id}.json")
+
+    def _generate_token_expiration(self, refresh_token_expires_in_seconds: int) -> str:
+        '''Generates a string-formatted expiration date using the
+        refresh_token_expires_in_seconds value attached to the Auth Client.
+        '''
+        return datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=refresh_token_expires_in_seconds)), '%Y-%m-%d %H:%M:%S %Z')
 
     def user_consent(self):
         '''Triggers the User Consent OAuth2.0 flow
@@ -56,9 +63,11 @@ class QuickbooksStream:
         auth_client.get_bearer_token(auth_code, realm_id=realm_id)
         self.config["realm_id"] = realm_id
         self.config["refresh_token"] = auth_client.refresh_token
-        self.config["refresh_token_expires_at"] = datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=auth_client.x_refresh_token_expires_in)), '%Y-%m-%d %H:%M:%S %Z')
+        self.config["refresh_token_expires_at"] = self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
+
         LOGGER.info('Generating new config..')
-        print(json.dumps(self.config, indent=2))
+        with open(self.args.config_path, 'r+') as f:
+            json.dump(self.config, f, indent=2)
 
     def _check_token_expiry(self, auth_client):
         '''Checks the expiration status
@@ -67,7 +76,7 @@ class QuickbooksStream:
         LOGGER.info("Checking Refresh Token expiry..")
         rt_expires_in = timedelta(seconds=auth_client.x_refresh_token_expires_in)
         rt_expiration_dt_utc = datetime.utcnow() + rt_expires_in
-        refresh_token_msg = f"Refresh Token {auth_client.refresh_token} expires on {rt_expiration_dt_utc} UTC"
+        refresh_token_msg = f"Refresh Token expires on {rt_expiration_dt_utc} UTC"
         if rt_expires_in.days <= 30:
             LOGGER.warning(refresh_token_msg)
         else:
@@ -77,6 +86,7 @@ class QuickbooksStream:
         '''Returns an OAuth2.0 Client for interacting
         with Quickbooks Reporting API.
         '''
+
         auth_client = AuthClient(self.config.get("client_id"),
                                  self.config.get("client_secret"),
                                  self.config.get("redirect_uri"),
@@ -90,7 +100,14 @@ class QuickbooksStream:
         if auth_client.refresh_token == self.config.get("refresh_token"):
             LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API are identical.")
         else:
-            LOGGER.warning("Config file Refresh Token and Refresh Token received from Refresh Token API has drifted.")
+            LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API has drifted.")
+            LOGGER.info("Overwriting Config file with new Refresh Token values..")
+
+            self.config["refresh_token"] = auth_client.refresh_token
+            self.config["refresh_token_expires_at"] = self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
+
+            with open(self.args.config_path, 'r+') as f:
+                json.dump(self.config, f, indent=2)
 
         # Check Refresh Token Expiry.
         self._check_token_expiry(auth_client)
@@ -187,9 +204,9 @@ class ProfitAndLossStream(QuickbooksStream):
     key_properties = 'StartDate'
     replication_method = 'FULL_TABLE'
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, args: Dict):
         self.schema = self._load_schema()
-        super().__init__(config)
+        super().__init__(config, args)
 
     def sync(self):
         with singer.metrics.job_timer(job_type=f"sync_{self.tap_stream_id}"):
@@ -226,9 +243,9 @@ class ProfitAndLossDetailStream(QuickbooksStream):
     key_properties = []
     replication_method = 'FULL_TABLE'
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, args: Dict):
         self.schema = self._load_schema()
-        super().__init__(config)
+        super().__init__(config, args)
 
     def _get_column_metadata(self, resp):
         columns = []
