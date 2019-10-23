@@ -76,7 +76,7 @@ class QuickbooksStream:
         LOGGER.info("Checking Refresh Token expiry..")
         rt_expires_in = timedelta(seconds=auth_client.x_refresh_token_expires_in)
         rt_expiration_dt_utc = datetime.utcnow() + rt_expires_in
-        refresh_token_msg = f"Refresh Token {auth_client.refresh_token} expires on {rt_expiration_dt_utc} UTC"
+        refresh_token_msg = f"Refresh Token expires on {rt_expiration_dt_utc} UTC"
         if rt_expires_in.days <= 30:
             LOGGER.warning(refresh_token_msg)
         else:
