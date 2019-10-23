@@ -3,7 +3,7 @@ set -e
 set -o pipefail
 set -u
 
-CONFIG_PATH="~/.config/tap-quickbooks-report/secrets"
+CONFIG_PATH=".config/secrets"
 mkdir -p "$(dirname "$CONFIG_PATH")"
 
 cmd=$1; shift

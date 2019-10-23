@@ -31,8 +31,6 @@ SYNC_REQUIRED_CONFIG_KEYS = [
     "client_secret",
     "environment",
     "redirect_uri",
-    "refresh_token",
-    "refresh_token_expires_at",
     "realm_id"
 ]
 

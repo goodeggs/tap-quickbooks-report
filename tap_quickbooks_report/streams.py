@@ -39,6 +39,12 @@ class QuickbooksStream:
         schema_path = self._get_abs_path("schemas")
         return singer.utils.load_json(f"{schema_path}/{self.tap_stream_id}.json")
 
+    def _generate_token_expiration(self, refresh_token_expires_in_seconds: int) -> str:
+        '''Generates a string-formatted expiration date using the
+        refresh_token_expires_in_seconds value attached to the Auth Client.
+        '''
+        return datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=refresh_token_expires_in_seconds)), '%Y-%m-%d %H:%M:%S %Z')
+
     def user_consent(self):
         '''Triggers the User Consent OAuth2.0 flow
         in order to retrieve an Authorization Code
@@ -56,8 +62,15 @@ class QuickbooksStream:
         realm_id = input('Enter the Realm ID: ')
         auth_client.get_bearer_token(auth_code, realm_id=realm_id)
         self.config["realm_id"] = realm_id
-        self.config["refresh_token"] = auth_client.refresh_token
-        self.config["refresh_token_expires_at"] = datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=auth_client.x_refresh_token_expires_in)), '%Y-%m-%d %H:%M:%S %Z')
+
+        secrets_json = json.dumps({
+            "refresh_token": auth_client.refresh_token,
+            "refresh_token_expires_at": self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
+        })
+
+        LOGGER.info("Setting Refresh Token Secrets..")
+        self._secrets_helper(method='set', secrets_json=secrets_json)
+
         LOGGER.info('Generating new config..')
         print(json.dumps(self.config, indent=2))
 
@@ -74,15 +87,34 @@ class QuickbooksStream:
         else:
             LOGGER.info(refresh_token_msg)
 
+    def _secrets_helper(self, method: str, secrets_json: Dict = None) -> Dict:
+        '''A common interface to the secrets_helper bash script.
+        '''
+
+        if method not in ['get', 'set']:
+            raise ValueError('Value for "method" supplied to _secrets_helper must be either "get" or "set".')
+
+        if method == 'get':
+            proc = subprocess.Popen(['./tap_quickbooks_report/bin/secrets_helper.sh', 'get'], stdout=subprocess.PIPE)
+            returncode = proc.wait()
+            if returncode != 0:
+                raise RuntimeError("secrets_helper get returned non-zero exit code")
+            return json.loads(proc.stdout.read().decode("UTF-8").rstrip("\n"))
+
+        elif method == 'set' and secrets_json is None:
+            raise ValueError('secrets_json must be supplied when using "set" method for secrets_helper.')
+
+        else:
+            proc = subprocess.Popen(['./tap_quickbooks_report/bin/secrets_helper.sh', 'set', secrets_json])
+            returncode = proc.wait()
+            if returncode != 0:
+                raise RuntimeError("secrets_helper set returned non-zero exit code")
+
     def _get_auth_client(self):
         '''Returns an OAuth2.0 Client for interacting
         with Quickbooks Reporting API.
         '''
-        proc = subprocess.Popen(['./secrets_helper', 'get'], stdout=subprocess.PIPE)
-        returncode = proc.wait()
-        if returncode != 0:
-            raise RuntimeError("secrets_helper get returned non-zero exit code")
-        secrets = json.loads(proc.stdout.read().decode("UTF-8").rstrip("\n"))
+        secrets = self._secrets_helper(method='get')
 
         auth_client = AuthClient(self.config.get("client_id"),
                                  self.config.get("client_secret"),
@@ -102,12 +134,10 @@ class QuickbooksStream:
 
             secrets_json = json.dumps({
                 "refresh_token": auth_client.refresh_token,
-                "refresh_token_expires_at": datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=auth_client.x_refresh_token_expires_in)), '%Y-%m-%d %H:%M:%S %Z')
+                "refresh_token_expires_at": self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
             })
-            proc = subprocess.Popen(['./secrets_helper', 'set', secrets_json])
-            returncode = proc.wait()
-            if returncode != 0:
-                raise RuntimeError("secrets_helper set returned non-zero exit code")
+
+            self._secrets_helper(method='set', secrets_json=secrets_json)
 
         # Check Refresh Token Expiry.
         self._check_token_expiry(auth_client)
