@@ -1,6 +1,5 @@
 import json
 import os
-import subprocess
 import webbrowser
 from datetime import datetime, timedelta
 from typing import Dict
