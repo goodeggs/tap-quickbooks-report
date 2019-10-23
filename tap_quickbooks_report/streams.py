@@ -1,6 +1,7 @@
 import json
 import os
 import webbrowser
+import subprocess
 from datetime import datetime, timedelta
 from typing import Dict
 
@@ -77,27 +78,36 @@ class QuickbooksStream:
         '''Returns an OAuth2.0 Client for interacting
         with Quickbooks Reporting API.
         '''
+        proc = subprocess.Popen(['./secrets_helper', 'get'], stdout=subprocess.PIPE)
+        returncode = proc.wait()
+        if returncode != 0:
+            raise RuntimeError("secrets_helper get returned non-zero exit code")
+        secrets = json.loads(proc.stdout.read().decode("UTF-8").rstrip("\n"))
+
         auth_client = AuthClient(self.config.get("client_id"),
                                  self.config.get("client_secret"),
                                  self.config.get("redirect_uri"),
                                  self.config.get("environment"),
-                                 refresh_token=self.config.get("refresh_token"),
+                                 refresh_token=secrets.get("refresh_token"),
                                  realm_id=self.config.get("realm_id"))
 
         # Refresh to get new Access Token.
         auth_client.refresh()
 
-        if auth_client.refresh_token == self.config.get("refresh_token"):
+        if auth_client.refresh_token == secrets.get("refresh_token"):
             LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API are identical.")
         else:
             LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API has drifted.")
             LOGGER.info("Overwriting Config file with new Refresh Token values..")
 
-            self.config["refresh_token"] = auth_client.refresh_token
-            self.config["refresh_token_expires_at"] = datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=auth_client.x_refresh_token_expires_in)), '%Y-%m-%d %H:%M:%S %Z')
-
-            with open('/app/.config/quickbooks.config.json', 'w') as f:
-                json.dump(self.config, f, indent=2)
+            secrets_json = json.dumps({
+                "refresh_token": auth_client.refresh_token,
+                "refresh_token_expires_at": datetime.strftime((datetime.utcnow().replace(tzinfo=pytz.UTC) + timedelta(seconds=auth_client.x_refresh_token_expires_in)), '%Y-%m-%d %H:%M:%S %Z')
+            })
+            proc = subprocess.Popen(['./secrets_helper', 'set', secrets_json])
+            returncode = proc.wait()
+            if returncode != 0:
+                raise RuntimeError("secrets_helper set returned non-zero exit code")
 
         # Check Refresh Token Expiry.
         self._check_token_expiry(auth_client)

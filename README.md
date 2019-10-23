@@ -41,3 +41,13 @@ INFO Generating new config..
  "refresh_token_expires_at": "<refresh-token-expires-at"
 }
 ```
+
+### secrets_helper
+
+Because Quickbooks does not offer an offline (valid _forever_) scope, we must continually update the refresh token.  As this is sensitive data, we don't write it back to the tap's own config.  Instead, the tap expects a storage helper (called secrets_helper in the current working directory) to proxy the refresh token to somewhere persistent & secure.  A reference implementation using files is included with the tap.
+
+You'll need to seed your data store with values obtained during the initial `--auth` flow.  That'll look something like:
+
+```
+$ ./secrets_helper set '{"refresh_token":"ZASdfafjlkdsa"}'
+```
