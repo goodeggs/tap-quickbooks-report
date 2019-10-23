@@ -24,6 +24,7 @@ class QuickbooksStream:
     API_MINOR_VERSION = 40
 
     config: Dict = attr.ib()
+    args: Dict = attr.ib()
     @config.validator
     def check(self, attribute, value):
         if value.get("environment") not in ["sandbox", "production"]:
@@ -62,17 +63,12 @@ class QuickbooksStream:
         realm_id = input('Enter the Realm ID: ')
         auth_client.get_bearer_token(auth_code, realm_id=realm_id)
         self.config["realm_id"] = realm_id
-
-        secrets_json = json.dumps({
-            "refresh_token": auth_client.refresh_token,
-            "refresh_token_expires_at": self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
-        })
-
-        LOGGER.info("Setting Refresh Token Secrets..")
-        self._secrets_helper(method='set', secrets_json=secrets_json)
+        self.config["refresh_token"] = auth_client.refresh_token
+        self.config["refresh_token_expires_at"] = self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
 
         LOGGER.info('Generating new config..')
-        print(json.dumps(self.config, indent=2))
+        with open(self.args.config_path, 'r+') as f:
+            json.dump(self.config, f, indent=2)
 
     def _check_token_expiry(self, auth_client):
         '''Checks the expiration status
@@ -87,59 +83,32 @@ class QuickbooksStream:
         else:
             LOGGER.info(refresh_token_msg)
 
-    def _secrets_helper(self, method: str, secrets_json: Dict = None) -> Dict:
-        '''A common interface to the secrets_helper bash script.
-        '''
-
-        if method not in ['get', 'set']:
-            raise ValueError('Value for "method" supplied to _secrets_helper must be either "get" or "set".')
-
-        script_path = self._get_abs_path("bin")
-
-        if method == 'get':
-            proc = subprocess.Popen([f"{script_path}/secrets_helper.sh", 'get'], stdout=subprocess.PIPE)
-            returncode = proc.wait()
-            if returncode != 0:
-                raise RuntimeError("secrets_helper get returned non-zero exit code")
-            return json.loads(proc.stdout.read().decode("UTF-8").rstrip("\n"))
-
-        elif method == 'set' and secrets_json is None:
-            raise ValueError('secrets_json must be supplied when using "set" method for secrets_helper.')
-
-        else:
-            proc = subprocess.Popen([f"{script_path}/secrets_helper.sh", 'set', secrets_json])
-            returncode = proc.wait()
-            if returncode != 0:
-                raise RuntimeError("secrets_helper set returned non-zero exit code")
-
     def _get_auth_client(self):
         '''Returns an OAuth2.0 Client for interacting
         with Quickbooks Reporting API.
         '''
-        secrets = self._secrets_helper(method='get')
 
         auth_client = AuthClient(self.config.get("client_id"),
                                  self.config.get("client_secret"),
                                  self.config.get("redirect_uri"),
                                  self.config.get("environment"),
-                                 refresh_token=secrets.get("refresh_token"),
+                                 refresh_token=self.config.get("refresh_token"),
                                  realm_id=self.config.get("realm_id"))
 
         # Refresh to get new Access Token.
         auth_client.refresh()
 
-        if auth_client.refresh_token == secrets.get("refresh_token"):
+        if auth_client.refresh_token == self.config.get("refresh_token"):
             LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API are identical.")
         else:
             LOGGER.info("Config file Refresh Token and Refresh Token received from Refresh Token API has drifted.")
             LOGGER.info("Overwriting Config file with new Refresh Token values..")
 
-            secrets_json = json.dumps({
-                "refresh_token": auth_client.refresh_token,
-                "refresh_token_expires_at": self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
-            })
+            self.config["refresh_token"] = auth_client.refresh_token
+            self.config["refresh_token_expires_at"] = self._generate_token_expiration(auth_client.x_refresh_token_expires_in)
 
-            self._secrets_helper(method='set', secrets_json=secrets_json)
+            with open(self.args.config_path, 'r+') as f:
+                json.dump(self.config, f, indent=2)
 
         # Check Refresh Token Expiry.
         self._check_token_expiry(auth_client)
@@ -236,9 +205,9 @@ class ProfitAndLossStream(QuickbooksStream):
     key_properties = 'StartDate'
     replication_method = 'FULL_TABLE'
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, args: Dict):
         self.schema = self._load_schema()
-        super().__init__(config)
+        super().__init__(config, args)
 
     def sync(self):
         with singer.metrics.job_timer(job_type=f"sync_{self.tap_stream_id}"):
@@ -275,9 +244,9 @@ class ProfitAndLossDetailStream(QuickbooksStream):
     key_properties = []
     replication_method = 'FULL_TABLE'
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, args: Dict):
         self.schema = self._load_schema()
-        super().__init__(config)
+        super().__init__(config, args)
 
     def _get_column_metadata(self, resp):
         columns = []

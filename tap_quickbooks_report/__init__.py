@@ -35,18 +35,18 @@ SYNC_REQUIRED_CONFIG_KEYS = [
 ]
 
 
-def user_consent(config):
+def user_consent(config, args):
     LOGGER.info('Starting User Consent process..')
-    stream = QuickbooksStream(config=config)
+    stream = QuickbooksStream(config=config, args=args)
     stream.user_consent()
 
 
-def sync(config):
+def sync(config, args):
     LOGGER.info('Starting sync..')
-    stream = ProfitAndLossStream(config=config)
+    stream = ProfitAndLossStream(config=config, args=args)
     stream.write_schema_message()
     stream.sync()
-    stream = ProfitAndLossDetailStream(config=config)
+    stream = ProfitAndLossDetailStream(config=config, args=args)
     stream.write_schema_message()
     stream.sync()
 
@@ -55,13 +55,13 @@ def main():
     args = parse_args(required_config_keys=AUTH_REQUIRED_CONFIG_KEYS)
     if args.auth is True:
         try:
-            user_consent(config=args.config)
+            user_consent(config=args.config, args=args)
         except Exception:
             LOGGER.exception('Caught exception during User Consent..')
     else:
         args = parse_args(required_config_keys=SYNC_REQUIRED_CONFIG_KEYS)
         try:
-            sync(config=args.config)
+            sync(config=args.config, args=args)
         except Exception:
             LOGGER.exception('Caught exception during Sync..')
 

@@ -36,7 +36,7 @@ setup(
     license='GPLv3',
     packages=find_packages(exclude=['tests']),
     package_data={
-        'tap_quickbooks_report': ['schemas/*.json', 'bin/*.sh']
+        'tap_quickbooks_report': ['schemas/*.json']
     },
     install_requires=[
         'requests==2.22.0',

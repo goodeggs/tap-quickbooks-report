@@ -23,26 +23,12 @@ Enter the Authorization Code: <auth-code>
 Enter the Realm ID: <realm-id>
 ```
 
-After entering the Authorization Code and Realm ID values, the tap will write the Refresh Token and Refresh Token Expiration Date to a secrets file using the `secrets_helper` bash script, and also return a new config file. Replace your existing config file with these new values:
+After entering the Authorization Code and Realm ID values, the tap will write the Realm ID, Refresh Token, and Refresh Token Expiration Date to the existing Config file:
 
 ```
 (tap-quickbooks-report) bash-3.2$ tap-quickbooks-report --auth
 INFO Starting User Consent process..
 Enter the Authorization Code: <auth-code>
 Enter the Realm ID: <realm-id>
-INFO Setting Refresh Token Secrets..
 INFO Generating new config..
-{
- "client_id": "<client-id>",
- "client_secret": "<client-secret>",
- "redirect_uri": "https://developer.intuit.com/v2/OAuth2Playground/RedirectUrl",
- "environment": "production",
- "realm_id": "<realm-id>"
-}
 ```
-
-### secrets_helper
-
-Because Quickbooks does not offer an offline (valid _forever_) scope, we must continually update the refresh token.  As this is sensitive data, we don't write it back to the tap's own config.  Instead, the tap expects a storage helper (called secrets_helper in the current working directory) to proxy the refresh token to somewhere persistent & secure.  A reference implementation using files is included with the tap.
-
-You'll need to seed your data store with values obtained during the initial `--auth` flow.
