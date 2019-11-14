@@ -58,13 +58,13 @@ def main():
     if args.auth is True:
         try:
             user_consent(config=args.config, args=args)
-        except Exception:
+        except:
             LOGGER.exception('Caught exception during User Consent..')
     else:
         args = parse_args(required_config_keys=SYNC_REQUIRED_CONFIG_KEYS)
         try:
             sync(config=args.config, args=args)
-        except Exception:
+        except:
             LOGGER.exception('Caught exception during Sync..')
 
 
