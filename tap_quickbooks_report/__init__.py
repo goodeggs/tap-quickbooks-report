@@ -1,9 +1,7 @@
-import logging
 import os
 
 import rollbar
 import singer
-from rollbar.logger import RollbarHandler
 
 from .streams import (ProfitAndLossDetailStream, ProfitAndLossStream,
                       QuickbooksStream)
@@ -15,9 +13,6 @@ ROLLBAR_ENVIRONMENT = os.environ["ROLLBAR_ENVIRONMENT"]
 LOGGER = singer.get_logger()
 
 rollbar.init(ROLLBAR_ACCESS_TOKEN, ROLLBAR_ENVIRONMENT)
-rollbar_handler = RollbarHandler()
-rollbar_handler.setLevel(logging.WARNING)
-LOGGER.addHandler(rollbar_handler)
 
 AUTH_REQUIRED_CONFIG_KEYS = [
     "client_id",
@@ -60,12 +55,14 @@ def main():
             user_consent(config=args.config, args=args)
         except:
             LOGGER.exception('Caught exception during User Consent..')
+            rollbar.report_exc_info()
     else:
         args = parse_args(required_config_keys=SYNC_REQUIRED_CONFIG_KEYS)
         try:
             sync(config=args.config, args=args)
         except:
             LOGGER.exception('Caught exception during Sync..')
+            rollbar.report_exc_info()
 
 
 if __name__ == "__main__":
