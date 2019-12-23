@@ -7,12 +7,18 @@ from .streams import (ProfitAndLossDetailStream, ProfitAndLossStream,
                       QuickbooksStream)
 from .utils import parse_args
 
-ROLLBAR_ACCESS_TOKEN = os.environ["ROLLBAR_ACCESS_TOKEN"]
-ROLLBAR_ENVIRONMENT = os.environ["ROLLBAR_ENVIRONMENT"]
-
 LOGGER = singer.get_logger()
 
-rollbar.init(ROLLBAR_ACCESS_TOKEN, ROLLBAR_ENVIRONMENT)
+
+try:
+    ROLLBAR_ACCESS_TOKEN = os.environ["ROLLBAR_ACCESS_TOKEN"]
+    ROLLBAR_ENVIRONMENT = os.environ["ROLLBAR_ENVIRONMENT"]
+except KeyError:
+    LOGGER.info("No Rollbar environment variables found. Rollbar logging disabled..")
+    log_to_rollbar = False
+else:
+    rollbar.init(ROLLBAR_ACCESS_TOKEN, ROLLBAR_ENVIRONMENT)
+    log_to_rollbar = True
 
 AUTH_REQUIRED_CONFIG_KEYS = [
     "client_id",
@@ -55,14 +61,16 @@ def main():
             user_consent(config=args.config, args=args)
         except:
             LOGGER.exception('Caught exception during User Consent..')
-            rollbar.report_exc_info()
+            if log_to_rollbar is True:
+                rollbar.report_exc_info()
     else:
         args = parse_args(required_config_keys=SYNC_REQUIRED_CONFIG_KEYS)
         try:
             sync(config=args.config, args=args)
         except:
             LOGGER.exception('Caught exception during Sync..')
-            rollbar.report_exc_info()
+            if log_to_rollbar is True:
+                rollbar.report_exc_info()
 
 
 if __name__ == "__main__":
