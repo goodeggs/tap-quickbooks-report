@@ -2,9 +2,10 @@ import json
 import os
 import webbrowser
 from datetime import datetime, timedelta
-from typing import Dict
+from typing import ClassVar, Dict, List, Optional
 
 import attr
+import backoff
 import pytz
 import requests
 import singer
@@ -16,11 +17,19 @@ from .version import __version__
 LOGGER = singer.get_logger()
 
 
+def is_fatal_code(e: requests.exceptions.RequestException) -> bool:
+    '''Helper function to determine if a Requests reponse status code
+    is a "fatal" status code. If it is, the backoff decorator will giveup
+    instead of attemtping to backoff.'''
+    return 400 <= e.response.status_code < 500 and e.response.status_code != 429
+
+
 @attr.s
 class QuickbooksStream:
-    BASE_URL = "https://quickbooks.api.intuit.com"
-    API_VERSION = "v3"
-    API_MINOR_VERSION = 40
+    tap_stream_id: ClassVar[Optional[str]] = None
+    base_url: ClassVar[str] = "https://quickbooks.api.intuit.com"
+    api_version: ClassVar[str] = "v3"
+    api_minor_version: ClassVar[int] = 40
 
     config: Dict = attr.ib()
     args: Dict = attr.ib()
@@ -124,13 +133,24 @@ class QuickbooksStream:
         headers["Date"] = singer.utils.strftime(singer.utils.now(), '%a, %d %b %Y %H:%M:%S %Z')
         return headers
 
-    def _get(self, auth_client, report_entity: str, params: Dict = None) -> Dict:
+    @backoff.on_exception(backoff.fibo,
+                          requests.exceptions.HTTPError,
+                          max_time=120,
+                          giveup=is_fatal_code,
+                          logger=LOGGER)
+    @backoff.on_exception(backoff.fibo,
+                          (requests.exceptions.ConnectionError,
+                           requests.exceptions.Timeout),
+                          max_time=120,
+                          logger=LOGGER)
+    def _get(self, auth_client, report_entity: str, params: Optional[Dict] = None) -> Dict:
         '''Constructs a standard way of making
         a GET request to the Quickbooks REST API.
         '''
-        url = f"{self.BASE_URL}/{self.API_VERSION}/company/{auth_client.realm_id}/reports/{report_entity}"
+        url = f"{self.base_url}/{self.api_version}/company/{auth_client.realm_id}/reports/{report_entity}"
         headers = self._construct_headers(access_token=auth_client.access_token)
-        params.update({"minorversion": self.API_MINOR_VERSION})
+        if params:
+            params.update({"minorversion": self.api_minor_version})
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         return response.json()
@@ -199,10 +219,10 @@ class QuickbooksStream:
 
 
 class ProfitAndLossStream(QuickbooksStream):
-    tap_stream_id = 'profit_and_loss'
-    stream = 'profit_and_loss'
-    key_properties = 'StartDate'
-    replication_method = 'FULL_TABLE'
+    tap_stream_id: ClassVar[str] = 'profit_and_loss'
+    stream: ClassVar[str] = 'profit_and_loss'
+    key_properties: ClassVar[str] = 'StartDate'
+    replication_method: ClassVar[str] = 'FULL_TABLE'
 
     def __init__(self, config: Dict, args: Dict):
         self.schema = self._load_schema()
@@ -238,10 +258,10 @@ class ProfitAndLossStream(QuickbooksStream):
 
 
 class ProfitAndLossDetailStream(QuickbooksStream):
-    tap_stream_id = 'profit_and_loss_detail'
-    stream = 'profit_and_loss_detail'
-    key_properties = []
-    replication_method = 'FULL_TABLE'
+    tap_stream_id: ClassVar[str] = 'profit_and_loss_detail'
+    stream: ClassVar[str] = 'profit_and_loss_detail'
+    key_properties: ClassVar[List[str]] = []
+    replication_method: ClassVar[str] = 'FULL_TABLE'
 
     def __init__(self, config: Dict, args: Dict):
         self.schema = self._load_schema()
