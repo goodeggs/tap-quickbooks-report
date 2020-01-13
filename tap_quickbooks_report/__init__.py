@@ -71,7 +71,7 @@ def main():
         if log_to_rollbar is True:
             LOGGER.info("Reporting exception info to Rollbar..")
             rollbar.report_exc_info()
-        LOGGER.critical(msg="Uncaught Exception..", exc_info=True)
+        LOGGER.exception(msg="Uncaught Exception..")
         sys.exit(1)
 
 
