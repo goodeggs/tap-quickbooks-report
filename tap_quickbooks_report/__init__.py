@@ -54,23 +54,24 @@ def sync(config, args):
     stream.sync()
 
 
-def main():
+def main_impl():
     args = parse_args(required_config_keys=AUTH_REQUIRED_CONFIG_KEYS)
     if args.auth is True:
-        try:
-            user_consent(config=args.config, args=args)
-        except:
-            LOGGER.exception('Caught exception during User Consent..')
-            if log_to_rollbar is True:
-                rollbar.report_exc_info()
+        user_consent(config=args.config, args=args)
     else:
         args = parse_args(required_config_keys=SYNC_REQUIRED_CONFIG_KEYS)
-        try:
-            sync(config=args.config, args=args)
-        except:
-            LOGGER.exception('Caught exception during Sync..')
-            if log_to_rollbar is True:
-                rollbar.report_exc_info()
+        sync(config=args.config, args=args)
+
+
+def main():
+    try:
+        main_impl()
+    except Exception as exc:
+        if log_to_rollbar is True:
+            LOGGER.info("Reporting exception info to Rollbar..")
+            rollbar.report_exc_info()
+        LOGGER.critical(exc)
+        raise
 
 
 if __name__ == "__main__":
