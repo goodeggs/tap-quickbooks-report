@@ -1,4 +1,5 @@
 import os
+import sys
 
 import rollbar
 import singer
@@ -54,23 +55,24 @@ def sync(config, args):
     stream.sync()
 
 
-def main():
+def _main():
     args = parse_args(required_config_keys=AUTH_REQUIRED_CONFIG_KEYS)
     if args.auth is True:
-        try:
-            user_consent(config=args.config, args=args)
-        except:
-            LOGGER.exception('Caught exception during User Consent..')
-            if log_to_rollbar is True:
-                rollbar.report_exc_info()
+        user_consent(config=args.config, args=args)
     else:
         args = parse_args(required_config_keys=SYNC_REQUIRED_CONFIG_KEYS)
-        try:
-            sync(config=args.config, args=args)
-        except:
-            LOGGER.exception('Caught exception during Sync..')
-            if log_to_rollbar is True:
-                rollbar.report_exc_info()
+        sync(config=args.config, args=args)
+
+
+def main():
+    try:
+        _main()
+    except Exception:
+        if log_to_rollbar is True:
+            LOGGER.info("Reporting exception info to Rollbar..")
+            rollbar.report_exc_info()
+        LOGGER.exception(msg="Uncaught Exception..")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
