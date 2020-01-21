@@ -233,7 +233,8 @@ class ProfitAndLossStream(QuickbooksStream):
             with singer.metrics.record_counter(endpoint=self.tap_stream_id) as counter:
                 client = self._get_auth_client()
                 params = {
-                    "start_date": "2014-01-01",
+                    "start_date": singer.utils.strftime(singer.utils.now() - timedelta(days=365), format_str='%Y-%m-01'),
+                    "end_date": singer.utils.strftime(singer.utils.now(), format_str="%Y-%m-%d"),
                     "accounting_method": "Accrual",
                     "summarize_column_by": "Month"
                 }
@@ -305,7 +306,8 @@ class ProfitAndLossDetailStream(QuickbooksStream):
             with singer.metrics.record_counter(endpoint=self.tap_stream_id) as counter:
                 client = self._get_auth_client()
                 params = {
-                    "start_date": "2014-01-01",
+                    "start_date": singer.utils.strftime(singer.utils.now() - timedelta(days=365), format_str='%Y-%m-01'),
+                    "end_date": singer.utils.strftime(singer.utils.now(), format_str="%Y-%m-%d"),
                     "accounting_method": "Accrual"
                 }
                 resp = self._get(auth_client=client, report_entity='ProfitAndLossDetail', params=params)
